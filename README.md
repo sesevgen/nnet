@@ -1,3 +1,5 @@
+Modified from hsidky to add gradient learning.
+
 Multi-layer perceptrons using RPROP
 ===================================
 
