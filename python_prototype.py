@@ -78,13 +78,13 @@ for iter in xrange(20000):
 	if (iter % 1000 == 0):
 		print "Error: " +str(np.mean(np.abs(l3_error)))
 
-plt.figure()
-plt.plot(X,y,X,l3)
-plt.show()
+#plt.figure()
+#plt.plot(X,y,X,l3)
+#plt.show()
 
-plt.figure()
-plt.plot(X,np.gradient(l3[:,0],X[1]-X[0]),X,l3d)
-plt.show()
+#plt.figure()
+#plt.plot(X,np.gradient(l3[:,0],X[1]-X[0]),X,l3d)
+#plt.show()
 
 # now try to teach from derivative
 
@@ -112,32 +112,49 @@ for iter in xrange(10000):
 	l3_error = (y-l3)	
 
 	# define error on the derivative
-	l3_der_error = (z - l3d)	
+	l3_der_error = (z - l3d)
 
-	# backward propogation
-	# second derivative of nonlinearity is simply f*f'
-	l3_delta = l3_der_error*(nonlin(l3,True)*l3d+nonlin(l3,True)*l3*l3d
+	# backward propogation	
+	l3_delta = l3_error * nonlin(l3,deriv=True)
 
 	l2_error = l3_delta.dot(syn2.T)
-	l2_delta = l2_error*(nonlin(l2,True)*l2)*l2d
+	l2_delta = l2_error * nonlin(l2,deriv=True)
 
 	l1_error = l2_delta.dot(syn1.T)	
-	l1_delta = l1_error*(nonlin(l1,True)*l1)*l1d
+	l1_delta = l1_error * nonlin(l1,deriv=True)
+	
+	# backward propogation of 1st derivative error
+	# second derivative of nonlinearity is simply f*f'
+	l3_der_delta = l3_der_error*(nonlin(l3,True)*l3)*l3d
+	#l3_der_delta = l3_der_error*(nonlin(l3,True))
+	
+	print l3_delta
+	print l3_der_delta
+	print " "
+	exit()
+
+	l2_der_error = l3_der_delta.dot(syn2.T)
+	l2_der_delta = l2_error*(nonlin(l2,True)*l2)*l2d + l2_der_error*(nonlin(l2,True))
+
+	l1_der_error = l2_delta.dot(syn1.T)	
+	l1_der_delta = l1_error*(nonlin(l1,True)*l1)*l1d + l1_der_error*(nonlin(l1,True))
 
 	# update weights
 	syn0 += np.dot(l0.T,l1_delta)
 	syn1 += np.dot(l1.T,l2_delta)
 	syn2 += np.dot(l2.T,l3_delta)
-
+	
 	# print error
 	if (iter % 1000 == 0):
 		print "Error: " +str(np.mean(np.abs(l3_der_error)))
 
+		
+print(l3)
 plt.figure()
 plt.plot(X,y,X,l3)
-plt.show()
+#plt.show()
 
 plt.figure()
 plt.plot(X,np.gradient(l3[:,0],X[1]-X[0]),X,l3d,X,z)
-plt.show()
+#plt.show()
 
