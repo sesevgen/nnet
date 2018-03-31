@@ -174,6 +174,19 @@ namespace nnet
         return mse/Q;
     }
 
+f_type neural_net::gradient_loss(const matrix_t& X, const matrix_t& Y)
+    {
+        assert(layers_.front().size == X.cols());
+        assert(layers_.back().size == Y.cols());
+        assert(X.rows() == Y.rows());
+        
+        // number of samples and output dim. 
+        size_t Q = Y.rows();
+        size_t S = Y.cols();
+        
+       
+    }
+
     void neural_net::train(const matrix_t& X, const matrix_t& Y, bool verbose)
     {
         // Reset mu.
@@ -283,6 +296,13 @@ namespace nnet
     }
 
     matrix_t neural_net::activation_gradient(const matrix_t& x) 
+    {
+        return (1.0-x.array().square()).matrix();
+    }
+
+
+	// Note : second derivative is just -2*y*(1-y^2) where y = tanh(x)
+    matrix_t neural_net::activation_secondgradient(const matrix_t& x) 
     {
         return (1.0-x.array().square()).matrix();
     }
