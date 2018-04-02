@@ -300,8 +300,7 @@ f_type neural_net::gradient_loss(const matrix_t& X, const matrix_t& Y)
         return (1.0-x.array().square()).matrix();
     }
 
-
-	// Note : second derivative is just -2*y*(1-y^2) where y = tanh(x)
+	// Note : second derivative is just -2*y*(1-y*2) where y = tanh(x)
     matrix_t neural_net::activation_secondgradient(const matrix_t& x) 
     {
         return (1.0-x.array().square()).matrix();
