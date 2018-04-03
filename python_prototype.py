@@ -3,12 +3,12 @@
 
 import numpy as np
 import matplotlib as mpl
-mpl.use('Agg')
+#mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 
 #Define layers, always 2 hidden layers but can change size.
-input_dim =2
+input_dim = 2
 hidden_layer1 = 3
 hidden_layer2 = 2
 output_dim = 1
@@ -43,20 +43,18 @@ if (importing == 0):
 	# derivative dataset
 	z = 2*X
 
-
-
 else:
-		X = np.loadtxt('adp_funn_example')
-		
-		#For testing only
-		y = X[:,2]
-		
-		yfull = X[:,2:]
-		X = X[:,0:2]
-		dataset = X.shape[0]
-		
-		X = np.reshape(X,(dataset,input_dim))
-		y = np.reshape(y,(dataset,output_dim))
+	X = np.loadtxt('adp_funn_example')
+	
+	#For testing only
+	y = X[:,input_dim]
+	
+	yfull = X[:,input_dim:]
+	X = X[:,0:input_dim]
+	dataset = X.shape[0]
+	
+	X = np.reshape(X,(dataset,input_dim))
+	y = np.reshape(y,(dataset,output_dim))
 		
 		
 # seed random numbers to make calculation
@@ -104,19 +102,15 @@ for iter in xrange(20000):
 	if (iter % 1000 == 0):
 		print "Error: " +str(np.mean(np.abs(l3_error)))
 
-plt.figure()
+#plt.figure()
 #plt.plot(X,y,X,l3)
 #plt.contourf(X[:,0],X[:,1],y[:,0])
 #plt.savefig('fig1.png')
+#plt.show()
 
-print y
-print l3
-
-plt.figure()
+#plt.figure()
 #plt.plot(X,np.gradient(l3[:,0],X[1]-X[0]),X,l3d)
 #plt.savefig('fig2.png')
-
-exit()
 
 # now try to teach from derivative
 # initialize weights randomly with mean 0
@@ -176,7 +170,6 @@ for iter in xrange(50000):
 		print " "
 
 		
-print(l3)
 plt.figure()
 plt.plot(X,y,X,l3)
 plt.show()
