@@ -2,16 +2,18 @@
 #iamtrask.github.io
 
 import numpy as np
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 
+
 #Define layers, always 2 hidden layers but can change size.
-input_dim =1
+input_dim =2
 hidden_layer1 = 3
 hidden_layer2 = 2
 output_dim = 1
 
-#Training data size
-dataset = 100
+importing = 1
 
 # sigmoid function
 def nonlin(x,y=0):
@@ -23,20 +25,40 @@ def nonlin(x,y=0):
 
 	return 1/(1+np.exp(-x))
 
-    
-# input dataset
-X = np.linspace(0.0,1,dataset)
-    
-# output dataset            
-y = np.power(X,2) + 0.0*np.random.random(dataset)
+if (importing == 0):
 
-# switch to column format
-X = np.reshape(X,(dataset,1))
-y = np.reshape(y,(dataset,1))
+	#Training data size
+	dataset = 100
 
-# derivative dataset
-z = 2*X
+	# input dataset
+	X = np.linspace(0.0,1,dataset)
+		
+	# output dataset            
+	y = np.power(X,2) + 0.0*np.random.random(dataset)
 
+	# switch to column format
+	X = np.reshape(X,(dataset,1))
+	y = np.reshape(y,(dataset,1))
+
+	# derivative dataset
+	z = 2*X
+
+
+
+else:
+		X = np.loadtxt('adp_funn_example')
+		
+		#For testing only
+		y = X[:,2]
+		
+		yfull = X[:,2:]
+		X = X[:,0:2]
+		dataset = X.shape[0]
+		
+		X = np.reshape(X,(dataset,input_dim))
+		y = np.reshape(y,(dataset,output_dim))
+		
+		
 # seed random numbers to make calculation
 # deterministic (just a good practice)
 np.random.seed(2)
@@ -62,7 +84,7 @@ for iter in xrange(20000):
 	l3d = np.dot(l2d,syn2)*nonlin(l3,1)
 
 	# define error	
-	l3_error = (y - l3)*0.1
+	l3_error = (y - l3)*1
 
 	# backward propogation	
 	l3_delta = l3_error * nonlin(l3,1)
@@ -83,12 +105,18 @@ for iter in xrange(20000):
 		print "Error: " +str(np.mean(np.abs(l3_error)))
 
 plt.figure()
-plt.plot(X,y,X,l3)
-plt.show()
+#plt.plot(X,y,X,l3)
+#plt.contourf(X[:,0],X[:,1],y[:,0])
+#plt.savefig('fig1.png')
+
+print y
+print l3
 
 plt.figure()
-plt.plot(X,np.gradient(l3[:,0],X[1]-X[0]),X,l3d)
-plt.show()
+#plt.plot(X,np.gradient(l3[:,0],X[1]-X[0]),X,l3d)
+#plt.savefig('fig2.png')
+
+exit()
 
 # now try to teach from derivative
 # initialize weights randomly with mean 0
