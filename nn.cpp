@@ -58,7 +58,13 @@ namespace nnet
         nparam_ = 0; 
         nn_layer l;
         l.size = topology(0);
+		for (int i = 0; i < l.size; ++i)
+		{
+			matrix_t dai;
+			(l.da).push_back(dai);		
+		}
         layers_.push_back(l);
+
         // init hidden and output layer
         for (int i = 1; i < topology.size(); ++i) 
         {
@@ -66,10 +72,16 @@ namespace nnet
             l.size  = topology(i);    
             l.W.setZero(l.size, layers_[i-1].size);    
             l.b.setZero(l.size);
+			for (int j = 0; j < layers_.back().size; ++j)
+			{
+				matrix_t daj;
+				(l.da).push_back(daj);		
+			}
             layers_.push_back(l);
             nparam_ += l.W.size() + l.b.size();
         }
-        tparams_ = {0.005, 1.e10, 10.0, 1.e-7, 0, 10};
+        tparams_ = {0.005, 1.e10, 10.0, 1.e-7, 0, 1000};
+
     }
 
     void neural_net::init_weights(f_type sd) 
@@ -89,6 +101,14 @@ namespace nnet
         
         // copy and scale data matrix
         layers_[0].a.noalias() = (X.rowwise() - x_shift_.transpose())*x_scale_.asDiagonal();
+				
+		// input layer has const. 1st derivative
+		for (int i = 0; i < layers_.front().size; ++i)
+		{
+			(layers_[0]).da[i].noalias() = matrix_t::Zero(X.rows(),X.cols());
+			(layers_[0]).da[i].col(i) = vector_t::LinSpaced(X.rows(),1,1);	
+		}
+
         for (int i = 1; i < layers_.size(); ++i)
         {
             // compute input for current layer
@@ -100,6 +120,15 @@ namespace nnet
             // apply activation function
             bool end = (i >= layers_.size() - 1);
             layers_[i].a = end ? layers_[i].z : activation(layers_[i].z);
+
+			// forward propogate derivative
+			for (int j = 0; j < layers_.front().size; ++j)
+			{
+				if(end)
+					(layers_[i]).da[j].noalias() = ((layers_[i-1]).da[j] * layers_[i].W.transpose());
+				else
+					(layers_[i]).da[j].noalias() = (((((layers_[i-1]).da[j] * layers_[i].W.transpose()).array()) * (activation_gradient(layers_[i].a)).array()).matrix());
+			}
         }
     }
 
@@ -127,10 +156,10 @@ namespace nnet
             forward_pass(X.row(k));
                 
             // compute error
-            error.row(k) = layers_.back().a*y_scale_.asDiagonal().inverse() - (Y.row(k) - y_shift_.transpose());
+			error.segment(k*S, S) = (layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - (Y.row(k).transpose() - y_shift_);
             
             // Compute loss. 
-            mse += error.row(k).rowwise().squaredNorm().mean()/S;
+            mse += error.segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S;
             
             // Number of layers. 
             size_t m = layers_.size();
@@ -172,19 +201,6 @@ namespace nnet
         j_ /= (Q*S);
         je_.noalias() = j_.transpose()*error;
         return mse/Q;
-    }
-
-f_type neural_net::gradient_loss(const matrix_t& X, const matrix_t& Y)
-    {
-        assert(layers_.front().size == X.cols());
-        assert(layers_.back().size == Y.cols());
-        assert(X.rows() == Y.rows());
-        
-        // number of samples and output dim. 
-        size_t Q = Y.rows();
-        size_t S = Y.cols();
-        
-       
     }
 
     void neural_net::train(const matrix_t& X, const matrix_t& Y, bool verbose)
@@ -278,6 +294,11 @@ f_type neural_net::gradient_loss(const matrix_t& X, const matrix_t& Y)
         return (layers_.back().a*y_scale_.asDiagonal().inverse()).rowwise() + y_shift_.transpose();
     }
 
+	matrix_t neural_net::get_gradient_forwardpass(int index) 
+    {
+        return ((layers_.back().da[index])*y_scale_.asDiagonal().inverse())*x_scale_.row(index);
+    }
+
     matrix_t neural_net::get_gradient(int index)
     {
         layers_.back().delta = matrix_t::Identity(layers_.back().size, layers_.back().size)*y_scale_.asDiagonal().inverse();
@@ -290,20 +311,24 @@ f_type neural_net::gradient_loss(const matrix_t& X, const matrix_t& Y)
         return layers_[1].delta*layers_[1].W*x_scale_.asDiagonal();
     }
 
+
+	// this is tanh(x)
     matrix_t neural_net::activation(const matrix_t& x)  
     {
         return (2.*((-2.*x).array().exp() + 1.0).inverse() - 1.0).matrix();
     }
 
+
+	// derivative is 1-tanh^2(x) = sech^2
     matrix_t neural_net::activation_gradient(const matrix_t& x) 
     {
         return (1.0-x.array().square()).matrix();
     }
 
-	// Note : second derivative is just -2*y*(1-y*2) where y = tanh(x)
+	// 2nd derivative is -2*tanh*sech^2 = -2*x*(1-x^2) 
     matrix_t neural_net::activation_secondgradient(const matrix_t& x) 
     {
-        return (1.0-x.array().square()).matrix();
+        return (-2.*(1.0-x.array().square())*(x.array())).matrix();
     }
 
     void neural_net::set_wb(const vector_t& wb)

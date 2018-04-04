@@ -18,6 +18,9 @@ namespace nnet
 		matrix_t a, z, delta, delta2;
 		matrix_t W, dEdW;
 		vector_t b;
+
+		// add vector of matrix to hold d(node)/d(input)
+		std::vector<matrix_t> da;
 	};
 
 	struct train_param
@@ -85,12 +88,18 @@ namespace nnet
 		
 		/** Get gradient of output(s) w.r.t. input i */
 		matrix_t get_gradient(int index);
+
+		/** Get gradient of output(s) w.r.t. input i, calculated via forward pass */
+		matrix_t get_gradient_forwardpass(int index);
 		
 		/** Returns the logistic function values f(x) given x. */
 		static matrix_t activation(const matrix_t& x);
 		
 		/** Returns the gradient f'(x) of the logistic function given f(x). */
 		static matrix_t activation_gradient(const matrix_t& x);
+
+		/** Returns the second gradient f''(x) of the logistic function given f(x). */
+		static matrix_t activation_secondgradient(const matrix_t& x);
 		
 		/** Set weights and biases. */ 
 		void set_wb(const vector_t& wb);
