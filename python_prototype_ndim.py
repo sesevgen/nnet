@@ -9,12 +9,13 @@ import matplotlib.pyplot as plt
 
 #Define layers, always 2 hidden layers but can change size.
 input_dim = 2
-hidden_layer1 = 12
-hidden_layer2 = 8
+hidden_layer1 = 8
+hidden_layer2 = 4
 output_dim = 1
 
-importing = 1
-loadw = 1
+importing = 0
+loadw = 0
+iterations = 50000
 
 # sigmoid function
 def nonlin(x,y=0):
@@ -29,20 +30,39 @@ def nonlin(x,y=0):
 if (importing == 0):
 
 	#Training data size
-	dataset = 100
+	dataset = 15
 
 	# input dataset
-	X = np.linspace(0.0,1,dataset)
+	X1,X2 = np.meshgrid(np.linspace(0,1,dataset),np.linspace(0,1,dataset))
+	X1l = np.reshape(X1,(dataset*dataset,1))
+	X2l = np.reshape(X2,(dataset*dataset,1))
+	X=np.hstack((np.reshape(X1,(dataset*dataset,1)),np.reshape(X2,(dataset*dataset,1))))
 		
 	# output dataset            
-	y = np.power(X,2) + 0.0*np.random.random(dataset)
+	#y = (np.reshape(X1,(dataset*dataset,1))*np.reshape(X2,(dataset*dataset,1)))
+	#y = np.sin(np.reshape(X1,(dataset*dataset,1)))+np.exp(np.reshape(X2,(dataset*dataset,1)))
+	#y = np.reshape(X1,(dataset*dataset,1))
+	#y = np.reshape(X1,(dataset*dataset,1)) - 0.5*np.reshape(X2,(dataset*dataset,1))
+	a = 0.4
+	b = 0.8
+	y = (np.power(a-X1l,2) + b*np.power(X2l-np.power(X1l,2),2))
+	scale = np.amax(y)
+	y = y/scale
+
+	#z = X
+	#z = np.hstack((np.sin(np.reshape(X1,(dataset*dataset,1))),np.exp(np.reshape(X2,(dataset*dataset,1)))))
+	z  = np.ones((dataset*dataset,2))
+	z[:,0] = (-2*a + 4*b*np.power(X1l,3) - 4*b*X1l*X2l + 2*X1l)[:,0]/scale
+	z[:,1] = (2*b*(X2l-np.power(X1l,2)))[:,0]/scale
 
 	# switch to column format
-	X = np.reshape(X,(dataset,1))
-	y = np.reshape(y,(dataset,1))
+	#X = np.reshape(X,(dataset,1))
+	#y = np.reshape(y,(dataset,1))
 
 	# derivative dataset
-	z = 2*X
+	#z = 2*X
+
+	dataset = dataset*dataset
 
 else:
 	#X = np.loadtxt('adp_ann_example')
@@ -103,7 +123,7 @@ syn1 = 2*np.random.random((hidden_layer1,hidden_layer2)) - 1
 syn2 = 2*np.random.random((hidden_layer2,output_dim)) - 1
 
 if(0):
-	for iter in xrange(20000):
+	for iter in xrange(iterations):
 
 		# forward propagation
 		l0 = X
@@ -188,10 +208,6 @@ if(0):
 
 if(1):
 
-	print syn0.shape
-	print syn1.shape
-	print syn2.shape
-
 	if(loadw == 0):
 		syn0 = 2*np.random.random((input_dim,hidden_layer1)) - 1
 		syn1 = 2*np.random.random((hidden_layer1,hidden_layer2)) - 1
@@ -204,18 +220,14 @@ if(1):
 		syn2 = np.reshape(syn2,(syn2.shape[0],1))
 		print "loaded"
 
-	print syn0.shape
-	print syn1.shape
-	print syn2.shape
-
 	grad0 = syn0
 	grad1 = syn1
 	grad2 = syn2
 
-	alpha = 0.01
-	beta = 0.9
+	alpha = 0.02
+	beta = 0.7
 
-	for iter in xrange(20000):
+	for iter in xrange(iterations):
 
 		# forward propagation
 		l0 = X
@@ -227,6 +239,7 @@ if(1):
 		l0d = np.ones((dataset,input_dim))
 		l0da = np.zeros((dataset,input_dim))
 		l0db = np.zeros((dataset,input_dim))
+		# switched, not sure why
 		l0da[:,0] = 1
 		l0db[:,1] = 1
 		
@@ -237,7 +250,6 @@ if(1):
 		l1db = np.dot(l0db,syn0)*nonlin(l1,1)
 		l2db = np.dot(l1db,syn1)*nonlin(l2,1)
 		l3db = np.dot(l2db,syn2)*nonlin(l3,1)
-
 
 		# define error
 		dEdl3 = (y - l3) * 0
@@ -299,9 +311,15 @@ if(1):
 			print " "
 
 	
-	xg = np.reshape(X[:,0], (31, 31))
-	yg = np.reshape(X[:,1], (31, 31))
-	l3g = np.reshape(-l3, (31,31))
+	xg = X1
+	yg = X2
+	zg = np.reshape(y, (np.sqrt(dataset),np.sqrt(dataset)))
+	l3g = np.reshape(l3, (np.sqrt(dataset),np.sqrt(dataset)))
+
+	plt.figure()
+	plt.contour(xg, yg, zg,colors='k')
+	plt.contourf(xg, yg, zg)
+	plt.savefig('training_data.png')
 
 	plt.figure()
 	plt.contour(xg, yg, l3g,colors='k')
@@ -309,8 +327,22 @@ if(1):
 	plt.savefig('nn_output.png')
 
 	plt.figure()
+	plt.quiver(X[:,0],X[:,1],z[:,0],z[:,1])
+	plt.savefig('training_gradient.png')
+
+	num_gradientx, num_gradienty = np.gradient(zg)
+	plt.figure()
+	plt.quiver(X[:,0],X[:,1],num_gradienty,num_gradientx)
+	plt.savefig('num_gradient_of_training_data.png')
+
+	plt.figure()
 	plt.quiver(X[:,0],X[:,1],l3da,l3db)
 	plt.savefig('nn_gradient.png')
+
+	num_gradientx, num_gradienty = np.gradient(l3g)
+	plt.figure()
+	plt.quiver(X[:,0],X[:,1],num_gradienty,num_gradientx)
+	plt.savefig('num_gradient_of_nn_output.png')
 
 	np.savetxt('syn0',syn0)
 	np.savetxt('syn1',syn1)
