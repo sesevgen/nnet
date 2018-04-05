@@ -15,7 +15,8 @@ namespace nnet
 	struct nn_layer 
 	{
 		size_t size;
-		matrix_t a, z, delta, delta2;
+		matrix_t a, z, delta; 
+		std::vector<matrix_t> delta2, delta3;
 		matrix_t W, dEdW;
 		vector_t b;
 
@@ -69,13 +70,15 @@ namespace nnet
 		void forward_pass(const matrix_t& X);
 
 		/** Compute NN loss w.r.t. input and output data.
-		* Also backpropogates error. 
+		* Also backpropogates error.
+		* Overloaded to add gradient learning.
+		* Ratio = 1 -> pure value learning, Ratio = 0 -> pure gradient learning. 
 		*/
 		f_type loss(const matrix_t& X, const matrix_t& Y);
-
-		f_type grad_loss(const matrix_t& X, const matrix_t& Y);
+		f_type loss(const matrix_t& X, const matrix_t& Y, double ratio = 0.5, const std::vector<matrix_t> &Z);
 
 		void train(const matrix_t& X, const matrix_t& Y, bool verbose = false);
+		void train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio = 0.5, bool verbose = false);
 		
 		/** Get training parameters. */
 		train_param get_train_params() const;

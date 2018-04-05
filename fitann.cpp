@@ -23,20 +23,27 @@ int main (int argc, const char* argv[])
    int k = 961;
        
    // training inputs
-   matrix_t X2(m, n_input);
-   matrix_t Z(m, n_output);
+   matrix_t X(m, n_input);
+   matrix_t Y(m, n_output);
+   matrix_t Z(m, n_input);
 
    // throw away stuff
    double eater;
    
    std::ifstream file("adp_ann_example", std::ios::in);
+	//std::ifstream file("adp_abf_example", std::ios::in);
 
    for(int i = 0; i < m; ++i)
    {
-       file >> X2(i, 0);
-	   file >> X2(i, 1);
-	   file >> eater;
-	   file >> Z(i,0);		
+       file >> X(i, 0);
+	   file >> X(i, 1);
+
+	   //file >> eater;
+	
+       file >> Y(i,0);
+
+	   file >> Z(i,0);	
+	   file >> Z(i,1);	
    }
 
    file.close();
@@ -44,15 +51,15 @@ int main (int argc, const char* argv[])
    Eigen::VectorXi topo(4);
    topo << n_input, 12, 6, n_output;
 
-
    nnet::neural_net nn(topo);
    nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 50});
 
-   nn.autoscale(X2,Z);
+   nn.autoscale(X,Y);
 
-   nn.train(X2,Z, true);
+   nn.train(X,Y, true);
+   //nn.train(X,Y,Z, true);
 
-   nn.forward_pass(X2);
+   nn.forward_pass(X);
 
    matrix_t YY = nn.get_activation();
    std::ofstream file4("output.txt");
