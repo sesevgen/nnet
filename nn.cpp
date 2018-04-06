@@ -165,18 +165,20 @@ namespace nnet
 		
 		layers_[m-1].delta = error;
 		
-		size_t j = 0 ;
+		size_t j = nparam_ ;
 		
 		for(size_t i = layers_.size() - 1; i > 0; --i)
 		{	
 			layers_[i].dEdW = (layers_[i-1].a.transpose() * layers_[i].delta).transpose();
 			layers_[i-1].delta = ((layers_[i].delta * layers_[i].W).array() * activation_gradient(layers_[i-1].a).array()).matrix();
+			j -= layers_[i].W.size();
 			je_.segment(j,layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(),layers_[i].dEdW.size());
 			std::cout << je_ << std::endl;
 			std::cout << std::endl;
-			j += layers_[i].W.size();
+
+			j -= layers_[i].b.size();
 			je_.segment(j,layers_[i].b.size()) = layers_[i].delta.colwise().sum();
-			j += layers_[i].b.size();
+			
 			std::cout << je_ << std::endl;
 			std::cout << std::endl;
 		}
@@ -186,10 +188,10 @@ namespace nnet
 		std::cout << std::endl;
 		vector_t temp = je_ / (Q*S);
         
-		std::cout << temp << std::endl;
+		std::cout << temp / temp.minCoeff() << std::endl;
 		std::cout << std::endl;
 	
-		std::cout << (layers_[3].dEdW).array() / (Q*S) <<std::endl; 
+		std::cout << (layers_[3].dEdW).array()   <<std::endl; 
 		std::cout << std::endl;
 		
         for(size_t k = 0; k < Q; ++k)
@@ -246,7 +248,7 @@ namespace nnet
         jj_ /= (Q*S);
         j_ /= (Q*S);
         je_.noalias() = j_.transpose()*error;
-		std::cout << je_  << std::endl;
+		std::cout << je_ / je_.minCoeff() << std::endl;
 
 		//std::cout << je_.rows()<< " ; " << je_.cols() << std::endl;
 		exit(1);
