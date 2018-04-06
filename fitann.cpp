@@ -38,18 +38,18 @@ int main (int argc, const char* argv[])
        file >> X(i, 0);
 	   file >> X(i, 1);
 
-	   //file >> eater;
+	   file >> eater;
 	
        file >> Y(i,0);
 
-	   file >> Z(i,0);	
-	   file >> Z(i,1);	
+	   //file >> Z(i,0);	
+	   //file >> Z(i,1);	
    }
 
    file.close();
    
    Eigen::VectorXi topo(4);
-   topo << n_input, 12, 6, n_output;
+   topo << n_input, 3, 2, n_output;
 
    nnet::neural_net nn(topo);
    nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 50});

@@ -145,11 +145,53 @@ namespace nnet
         // Resize jacobian and define error. 
         je_.resize(nparam_);
         j_.resize(S*Q, nparam_);
+		jj_ = j_.transpose()*j_;
         vector_t error(S*Q);
         
         // MSE. 
         f_type mse = 0.;
+		
+		// forward pass
+		forward_pass(X);
+		
+		// compute error 
+		error = (layers_.back().a*y_scale_.asDiagonal().inverse()).rowwise() + y_shift_.transpose() - Y;
+		
+		// compute loss
+		mse += error.transpose().rowwise().squaredNorm().mean()/S;
+		
+		// Number of layers. 
+        size_t m = layers_.size();
+		
+		layers_[m-1].delta = error;
+		
+		size_t j = 0 ;
+		
+		for(size_t i = layers_.size() - 1; i > 0; --i)
+		{	
+			layers_[i].dEdW = (layers_[i-1].a.transpose() * layers_[i].delta).transpose();
+			layers_[i-1].delta = ((layers_[i].delta * layers_[i].W).array() * activation_gradient(layers_[i-1].a).array()).matrix();
+			je_.segment(j,layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(),layers_[i].dEdW.size());
+			std::cout << je_ << std::endl;
+			std::cout << std::endl;
+			j += layers_[i].W.size();
+			je_.segment(j,layers_[i].b.size()) = layers_[i].delta.colwise().sum();
+			j += layers_[i].b.size();
+			std::cout << je_ << std::endl;
+			std::cout << std::endl;
+		}
+		
+		
+		std::cout << je_ << std::endl;
+		std::cout << std::endl;
+		vector_t temp = je_ / (Q*S);
         
+		std::cout << temp << std::endl;
+		std::cout << std::endl;
+	
+		std::cout << (layers_[3].dEdW).array() / (Q*S) <<std::endl; 
+		std::cout << std::endl;
+		
         for(size_t k = 0; k < Q; ++k)
         {
             // forward pass
@@ -172,7 +214,7 @@ namespace nnet
             j -= layers_[m-1].W.size();
             for(size_t p = 0; p < S; ++p)
             {
-                layers_[m-1].dEdW.noalias() = (layers_[m-1].delta.col(p)*layers_[m-2].a);
+                layers_[m-1].dEdW = (layers_[m-1].delta.col(p)*layers_[m-2].a);
                 j_.block(S*k+p, j, 1, layers_[m-1].W.size()) = Map<vector_t>(layers_[m-1].dEdW.data(), layers_[m-1].dEdW.size()).transpose();
             }
         
@@ -195,12 +237,21 @@ namespace nnet
                 j_.block(S*k, j, S, layers_[i].b.size()) = layers_[i].delta.transpose();
             }
         }
+		
+		//std::cout << j_.rows()<< " ; " << j_.cols() << std::endl;
+		
 
         jj_.noalias() = j_.transpose()*j_;
+		//std::cout << jj_.rows()<< " ; " << jj_.cols() << std::endl;
         jj_ /= (Q*S);
         j_ /= (Q*S);
         je_.noalias() = j_.transpose()*error;
+		std::cout << je_  << std::endl;
+
+		//std::cout << je_.rows()<< " ; " << je_.cols() << std::endl;
+		exit(1);
         return mse/Q;
+		
     }
 
 	f_type neural_net::loss(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio)
@@ -289,7 +340,7 @@ namespace nnet
         return mse/Q;
     }
 
-    void neural_net::train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double train, bool verbose)
+    void neural_net::train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio, bool verbose)
     {
         // Reset mu.
         tparams_.mu = 0.005;
