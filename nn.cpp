@@ -163,7 +163,7 @@ namespace nnet
 		// Number of layers. 
         size_t m = layers_.size();
 		
-		layers_[m-1].delta = error;
+		layers_[m-1].delta = error * y_scale_.asDiagonal().inverse();
 		
 		size_t j = nparam_ ;
 		
@@ -173,26 +173,12 @@ namespace nnet
 			layers_[i-1].delta = ((layers_[i].delta * layers_[i].W).array() * activation_gradient(layers_[i-1].a).array()).matrix();
 			j -= layers_[i].W.size();
 			je_.segment(j,layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(),layers_[i].dEdW.size());
-			std::cout << je_ << std::endl;
-			std::cout << std::endl;
 
 			j -= layers_[i].b.size();
 			je_.segment(j,layers_[i].b.size()) = layers_[i].delta.colwise().sum();
-			
-			std::cout << je_ << std::endl;
-			std::cout << std::endl;
 		}
 		
-		
-		std::cout << je_ << std::endl;
-		std::cout << std::endl;
-		vector_t temp = je_ / (Q*S);
-        
-		std::cout << temp / temp.minCoeff() << std::endl;
-		std::cout << std::endl;
-	
-		std::cout << (layers_[3].dEdW).array()   <<std::endl; 
-		std::cout << std::endl;
+		je_ /= (Q*S) ;
 		
         for(size_t k = 0; k < Q; ++k)
         {
@@ -239,18 +225,13 @@ namespace nnet
                 j_.block(S*k, j, S, layers_[i].b.size()) = layers_[i].delta.transpose();
             }
         }
-		
-		//std::cout << j_.rows()<< " ; " << j_.cols() << std::endl;
-		
-
+				
         jj_.noalias() = j_.transpose()*j_;
-		//std::cout << jj_.rows()<< " ; " << jj_.cols() << std::endl;
         jj_ /= (Q*S);
         j_ /= (Q*S);
         je_.noalias() = j_.transpose()*error;
-		std::cout << je_ / je_.minCoeff() << std::endl;
 
-		//std::cout << je_.rows()<< " ; " << je_.cols() << std::endl;
+		std::cout << je_.array() / temp.array() << std::endl;
 		exit(1);
         return mse/Q;
 		
@@ -284,9 +265,6 @@ namespace nnet
         {
             // forward pass
             forward_pass(X.row(k));
-
-			std::cout << X.row(k) << std::endl;
-			exit(1);
                 
             // compute error
 			error.segment(k*S, S) = (layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - (Y.row(k).transpose() - y_shift_);
