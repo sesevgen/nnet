@@ -148,11 +148,9 @@ namespace nnet
 	jj_ = j_.transpose()*j_;
         vector_t error(S*Q);
 
-	        
         // MSE. 
-        f_type mse = 0.;
-	
-	/*	
+        f_type mse = 0.;	
+		
 	// forward pass
 	forward_pass(X);
 	
@@ -166,35 +164,34 @@ namespace nnet
 	size_t m = layers_.size();
 	
 	// For some reason scaling with y_scale_ here is creating an -inf at the end of the matrix.
-	layers_[m-1].delta = error;
-	//layers_[m-1].delta = error * y_scale_.asDiagonal().inverse();
-	//layers_[m-1].delta.noalias() = (error.array()/error.array()).matrix(); //* y_scale_.asDiagonal().inverse();
-	//layers_[m-1].delta(layers_[m-1].delta.rows()-1,0) = 1.0;
-	//std::cout << layers_[m-1].delta << std::endl;
+	//layers_[m-1].delta = (error.array()/error.array()).matrix()*y_scale_.asDiagonal().inverse();
+	layers_[m-1].delta = (error.array()/error.array()).matrix()*35.7711;
 
 	size_t j = nparam_ ;	
 	
 	for(size_t i = layers_.size() - 1; i > 0; --i)
 	{	
-		layers_[i].dEdW = (layers_[i-1].a.transpose() * layers_[i].delta).transpose();
+		//std::cout << layers_[i-1].a << std::endl;
+		//std::cout << std::endl;
+		//std::cout << layers_[i].delta<< std::endl;
+		//exit(1);
+		layers_[i].dEdW = (layers_[i-1].a.transpose() * layers_[i].delta).transpose(); 
 		layers_[i-1].delta = ((layers_[i].delta * layers_[i].W).array() * activation_gradient(layers_[i-1].a).array()).matrix();
 		j -= layers_[i].W.size();
-	
 		
-		//j_.block(0,S*Q,j,layers_[i].W.size()) = Map<vector_t>(wtemp.data(),wtemp.size());
+		// Can make this more efficient
+		for(size_t k = 0; k < S; ++k)
+			j_.block(0,j,Q,layers_[i].W.size())	
 		je_.segment(j,layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(),layers_[i].dEdW.size());
 
 		j -= layers_[i].b.size();
-		//j_.block(0,S*Q,j,layers_[i].b.size()) = Map<vector_t>(layers_[i].delta.data(),layers_[i].delta.size());
+		j_.block(0,j,S*Q,layers_[i].b.size()) = layers_[i].delta;
 		je_.segment(j,layers_[i].b.size()) = layers_[i].delta.colwise().sum();
 	}
 	
 	je_ = (je_*y_scale_.asDiagonal().inverse()) / (Q*S) ;
-	//matrix_t tempje = je_;
+	matrix_t tempje = je_;
 	
-	//j_ = (error.array().inverse()).matrix() * je_.transpose();
-	//matrix_t tempj = j_;
-	*/	
         for(size_t k = 0; k < Q; ++k)
         {
             // forward pass
@@ -217,6 +214,10 @@ namespace nnet
             j -= layers_[m-1].W.size();
             for(size_t p = 0; p < S; ++p)
             {
+		std::cout << (layers_[m-1].delta.col(p)*layers_[m-2].a) << std::endl;
+		//std::cout << std::endl;
+		//std::cout << layers_[m-2].a << std::endl;
+		exit(1);
                 layers_[m-1].dEdW = (layers_[m-1].delta.col(p)*layers_[m-2].a);
                 j_.block(S*k+p, j, 1, layers_[m-1].W.size()) = Map<vector_t>(layers_[m-1].dEdW.data(), layers_[m-1].dEdW.size()).transpose();
             }
@@ -242,35 +243,18 @@ namespace nnet
         }
 				
         jj_.noalias() = j_.transpose()*j_;
-	//std::cout << jj_.row(0).array()/temp.row(0).array() << std::endl;
-	//std::cout << jj_.col(0).array()/temp.row(0).array().transpose() << std::endl;
-	//std::cout << temp.rows() << " " << temp.cols() << std::endl;
         jj_ /= (Q*S);
         j_ /= (Q*S);
         je_.noalias() = j_.transpose()*error;
-	
-	//std::cout << j_.rows() << " " << j_.cols() << std::endl;
-	//std::cout << jj_.rows() << " "<< jj_.cols() << std::endl;
-
-	//std::cout << j_.array() / tempj.array() << std::endl;
-	
-//        j	error 	je	    jt		jj
-//	1,2,3  1        1+4+9	    1,4		1+4+9   
-//	4,5,6  2 	4+10+18	    2,5
-//	       3		    3,6
-
-	//matrix_t backjj = (je_.array()/error.array()).matrix();
-	//matrix_t tempjj = je_ * je_.transpose(); 
-
-	//std::cout << je_.array() / tempje.array() << std::endl;
-	//std::cout << j_.array() / ((error.array().inverse()).matrix()*je_.transpose()).array()  << std::endl;
-	//exit(1);
+	std::cout << je_.array() / tempje.array() << std::endl;	
+	exit(1);
         return mse/Q;
 		
     }
 
 	f_type neural_net::loss(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio)
     {
+	/*
         assert(layers_.front().size == X.cols());
         assert(layers_.back().size == Y.cols());
         assert(X.rows() == Y.rows());
@@ -303,12 +287,12 @@ namespace nnet
 
 	// compute error on derivative
 	for(size_t i = 0; i < X.cols(); ++i)
-		dererror[i].segment(k*S, S) = ((layers_.back().da[i]*y_scale_.asDiagonal().inverse())*x_scale_row(i).asDiagonal()).transpose()* - (Z[i].row(k).transpose());
+		//dererror[i].segment(k*S, S) = ((layers_.back().da[i]*y_scale_.asDiagonal().inverse())*x_scale_.row(i).asDiagonal()).transpose()* - (Z[i].row(k).transpose());
             
             // Compute loss. 
             mse += error.segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*ratio;
 	for(size_t i = 0; i < X.cols(); ++i)
-		mse += dererror[i].segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*(1.0/ratio);
+		//mse += dererror[i].segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*(1.0/ratio);
             
             // Number of layers. 
             size_t m = layers_.size();
@@ -350,6 +334,7 @@ namespace nnet
         j_ /= (Q*S);
         je_.noalias() = j_.transpose()*error;
         return mse/Q;
+	*/
     }
 
     void neural_net::train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio, bool verbose)
