@@ -145,48 +145,63 @@ namespace nnet
         // Resize jacobian and define error. 
         je_.resize(nparam_);
         j_.resize(S*Q, nparam_);
-		jj_ = j_.transpose()*j_;
+	jj_ = j_.transpose()*j_;
         vector_t error(S*Q);
-        
+
+	        
         // MSE. 
         f_type mse = 0.;
-		
-		// forward pass
-		forward_pass(X);
-		
-		// compute error 
-		error = (layers_.back().a*y_scale_.asDiagonal().inverse()).rowwise() + y_shift_.transpose() - Y;
-		
-		// compute loss
-		mse += error.transpose().rowwise().squaredNorm().mean()/S;
-		
-		// Number of layers. 
-        size_t m = layers_.size();
-		
-		layers_[m-1].delta = error * y_scale_.asDiagonal().inverse();
-		
-		size_t j = nparam_ ;
-		
-		for(size_t i = layers_.size() - 1; i > 0; --i)
-		{	
-			layers_[i].dEdW = (layers_[i-1].a.transpose() * layers_[i].delta).transpose();
-			layers_[i-1].delta = ((layers_[i].delta * layers_[i].W).array() * activation_gradient(layers_[i-1].a).array()).matrix();
-			j -= layers_[i].W.size();
-			je_.segment(j,layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(),layers_[i].dEdW.size());
+	
+	/*	
+	// forward pass
+	forward_pass(X);
+	
+	// compute error 
+	error = (layers_.back().a*y_scale_.asDiagonal().inverse()).rowwise() + y_shift_.transpose() - Y;
+	
+	// compute loss
+	mse += error.transpose().rowwise().squaredNorm().mean()/S;
+	
+	// Number of layers
+	size_t m = layers_.size();
+	
+	// For some reason scaling with y_scale_ here is creating an -inf at the end of the matrix.
+	layers_[m-1].delta = error;
+	//layers_[m-1].delta = error * y_scale_.asDiagonal().inverse();
+	//layers_[m-1].delta.noalias() = (error.array()/error.array()).matrix(); //* y_scale_.asDiagonal().inverse();
+	//layers_[m-1].delta(layers_[m-1].delta.rows()-1,0) = 1.0;
+	//std::cout << layers_[m-1].delta << std::endl;
 
-			j -= layers_[i].b.size();
-			je_.segment(j,layers_[i].b.size()) = layers_[i].delta.colwise().sum();
-		}
+	size_t j = nparam_ ;	
+	
+	for(size_t i = layers_.size() - 1; i > 0; --i)
+	{	
+		layers_[i].dEdW = (layers_[i-1].a.transpose() * layers_[i].delta).transpose();
+		layers_[i-1].delta = ((layers_[i].delta * layers_[i].W).array() * activation_gradient(layers_[i-1].a).array()).matrix();
+		j -= layers_[i].W.size();
+	
 		
-		je_ /= (Q*S) ;
-		
+		//j_.block(0,S*Q,j,layers_[i].W.size()) = Map<vector_t>(wtemp.data(),wtemp.size());
+		je_.segment(j,layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(),layers_[i].dEdW.size());
+
+		j -= layers_[i].b.size();
+		//j_.block(0,S*Q,j,layers_[i].b.size()) = Map<vector_t>(layers_[i].delta.data(),layers_[i].delta.size());
+		je_.segment(j,layers_[i].b.size()) = layers_[i].delta.colwise().sum();
+	}
+	
+	je_ = (je_*y_scale_.asDiagonal().inverse()) / (Q*S) ;
+	//matrix_t tempje = je_;
+	
+	//j_ = (error.array().inverse()).matrix() * je_.transpose();
+	//matrix_t tempj = j_;
+	*/	
         for(size_t k = 0; k < Q; ++k)
         {
             // forward pass
             forward_pass(X.row(k));
                 
             // compute error
-			error.segment(k*S, S) = (layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - (Y.row(k).transpose() - y_shift_);
+	error.segment(k*S, S) = (layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - (Y.row(k).transpose() - y_shift_);
             
             // Compute loss. 
             mse += error.segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S;
@@ -227,12 +242,29 @@ namespace nnet
         }
 				
         jj_.noalias() = j_.transpose()*j_;
+	//std::cout << jj_.row(0).array()/temp.row(0).array() << std::endl;
+	//std::cout << jj_.col(0).array()/temp.row(0).array().transpose() << std::endl;
+	//std::cout << temp.rows() << " " << temp.cols() << std::endl;
         jj_ /= (Q*S);
         j_ /= (Q*S);
         je_.noalias() = j_.transpose()*error;
+	
+	//std::cout << j_.rows() << " " << j_.cols() << std::endl;
+	//std::cout << jj_.rows() << " "<< jj_.cols() << std::endl;
 
-		std::cout << je_.array() / temp.array() << std::endl;
-		exit(1);
+	//std::cout << j_.array() / tempj.array() << std::endl;
+	
+//        j	error 	je	    jt		jj
+//	1,2,3  1        1+4+9	    1,4		1+4+9   
+//	4,5,6  2 	4+10+18	    2,5
+//	       3		    3,6
+
+	//matrix_t backjj = (je_.array()/error.array()).matrix();
+	//matrix_t tempjj = je_ * je_.transpose(); 
+
+	//std::cout << je_.array() / tempje.array() << std::endl;
+	//std::cout << j_.array() / ((error.array().inverse()).matrix()*je_.transpose()).array()  << std::endl;
+	//exit(1);
         return mse/Q;
 		
     }
@@ -252,31 +284,31 @@ namespace nnet
         j_.resize(S*Q, nparam_);
         vector_t error(S*Q);
 
-		// Define error on d(output)/d(input) gradient
-		std::vector <vector_t> dererror;
-		for(size_t i = 0; i < X.cols(); ++i)
-			dererror.push_back(error);		
+	// Define error on d(output)/d(input) gradient
+	std::vector <matrix_t> dererror;
+	for(size_t i = 0; i < X.cols(); ++i)
+		dererror.push_back(error);		
         
         // MSE. 
         f_type mse = 0.;
         
-		// Loop over samples.
+	// Loop over samples.
         for(size_t k = 0; k < Q; ++k)
         {
             // forward pass
             forward_pass(X.row(k));
                 
             // compute error
-			error.segment(k*S, S) = (layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - (Y.row(k).transpose() - y_shift_);
+	error.segment(k*S, S) = (layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - (Y.row(k).transpose() - y_shift_);
 
-			// compute error on derivative
-			for(size_t i = 0; i < X.cols(); ++i)
-				dererror[i].segment(k*S, S) = (layers_.back().da[i]*y_scale_.asDiagonal().inverse()).transpose()*x_scale_.row(i) - (Z[i].row(k).transpose());
+	// compute error on derivative
+	for(size_t i = 0; i < X.cols(); ++i)
+		dererror[i].segment(k*S, S) = ((layers_.back().da[i]*y_scale_.asDiagonal().inverse())*x_scale_row(i).asDiagonal()).transpose()* - (Z[i].row(k).transpose());
             
             // Compute loss. 
             mse += error.segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*ratio;
-			for(size_t i = 0; i < X.cols(); ++i)
-				mse += dererror[i].segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*(1.0/ratio);
+	for(size_t i = 0; i < X.cols(); ++i)
+		mse += dererror[i].segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*(1.0/ratio);
             
             // Number of layers. 
             size_t m = layers_.size();
