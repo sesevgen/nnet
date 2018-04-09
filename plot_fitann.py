@@ -3,7 +3,8 @@ import matplotlib as mpl
 #mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-X = np.loadtxt('adp_ann_example')
+#X = np.loadtxt('adp_ann_example')
+X = np.loadtxt('adp_abf_example')
 Y = X[:,1]
 Z = X[:,3]
 X = X[:,0]

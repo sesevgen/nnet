@@ -17,7 +17,7 @@ namespace nnet
 		size_t size;
 		matrix_t a, z, delta; 
 		std::vector<matrix_t> delta2, delta3;
-		matrix_t W, dEdW;
+		matrix_t W, dEdW, dEddW;
 		vector_t b;
 
 		// add vector of matrix to hold d(node)/d(input)
@@ -43,7 +43,8 @@ namespace nnet
 		train_param tparams_;
 
 		/** Holds the error gradient, jacobian, ... */ 
-		matrix_t j_, jj_;
+		matrix_t j_, jj_; 
+		std::vector<matrix_t> jder_;
 		vector_t je_;
 
 		/** Number of adjustable parameters. */

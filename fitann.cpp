@@ -13,74 +13,91 @@ typedef Eigen::Array<f_type, Eigen::Dynamic, Eigen::Dynamic> array_t;
 
 int main (int argc, const char* argv[]) 
 {
-   // input dimensionality
-   int n_input = 2;
-   // output dimensionality
-   int n_output = 1;
-   // number of training samples
-   int m = 961;
-   // number of evaluation samples
-   int k = 961;
-       
-   // training inputs
-   matrix_t X(m, n_input);
-   matrix_t Y(m, n_output);
-   matrix_t Z(m, n_input);
+	// input dimensionality
+	int n_input = 2;
+	// output dimensionality
+	int n_output = 1;
+	// number of training samples
+	int m = 961;
+//int m = 161;
+	// number of evaluation samples
+	int k = 961;
+//int k = 161;
+	   
+	// training inputs
+	matrix_t X(m, n_input);
+	matrix_t Y(m, n_output);
+	std::vector<matrix_t> Z;
+	for(int i = 0; i < n_input; ++i)
+		Z.push_back(Y);
 
-   // throw away stuff
-   double eater;
-   
-   std::ifstream file("adp_ann_example", std::ios::in);
-	//std::ifstream file("adp_abf_example", std::ios::in);
+	// throw away stuff
+	double eater;
 
-   for(int i = 0; i < m; ++i)
-   {
-       file >> X(i, 0);
-	   file >> X(i, 1);
+	//std::ifstream file("adp_ann_example", std::ios::in);
+	std::ifstream fileZ("adp_abf_example", std::ios::in);
 
-	   file >> eater;
-	
-       file >> Y(i,0);
+	for(int i = 0; i < m; ++i)
+	{
+		fileZ >> X(i, 0);
+		fileZ >> X(i, 1);
 
-	   //file >> Z(i,0);	
-	   //file >> Z(i,1);	
-   }
+		//file >> eater;
 
-   file.close();
-   
-   Eigen::VectorXi topo(4);
-   topo << n_input, 3, 2, n_output;
+		//Y(i,0) = 0.0;
 
-   nnet::neural_net nn(topo);
-   nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 50});
+		fileZ >> Z[0](i,0);	
+		fileZ >> Z[1](i,0);	
+	}
 
-   nn.autoscale(X,Y);
+	fileZ.close();
+	std::ifstream fileY("adp_ann_example", std::ios::in);
 
-   nn.train(X,Y, true);
-   //nn.train(X,Y,Z, true);
+	for(int i = 0; i < m; ++i)
+	{
+		fileY >> eater;
+		fileY >> eater;
+		fileY >> eater;
 
-   nn.forward_pass(X);
+		//Y(i,0) = 0.0;
 
-   matrix_t YY = nn.get_activation();
-   std::ofstream file4("output.txt");
-   file4 << YY << std::endl;
-   file4.close();
+		fileY >> Y(i,0);	
+	}
+	fileY.close();
 
-   matrix_t dX = nn.get_gradient_forwardpass(0);
-   std::ofstream file5("dx.txt");
-   file5 << dX << std::endl;
-   file5.close();
+	Eigen::VectorXi topo(4);
+	topo << n_input, 8, 6, n_output;
 
-   matrix_t dY = nn.get_gradient_forwardpass(1);
-   std::ofstream file6("dy.txt");
-   file6 << dY << std::endl;
-   file6.close();
+	nnet::neural_net nn(topo);
+	nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 50});
 
-   std::ofstream file7("dxy_bp.txt");
-   for(int i = 0; i < m; ++i)
-   		file7 << nn.get_gradient(i) << std::endl;
-   file7.close();
+	nn.autoscale(X,Y);
+
+	nn.train(X,Y,Z,1.0, true);
+	//nn.train(X,Y,true);
+
+	nn.forward_pass(X);
+
+	matrix_t YY = nn.get_activation();
+	std::ofstream file4("output.txt");
+	file4 << YY << std::endl;
+	file4.close();
+
+	matrix_t dX = nn.get_gradient_forwardpass(0);
+	std::ofstream file5("dx.txt");
+	file5 << dX << std::endl;
+	file5.close();
+
+	matrix_t dY = nn.get_gradient_forwardpass(1);
+	std::ofstream file6("dy.txt");
+	file6 << dY << std::endl;
+	file6.close();
+
+	std::ofstream file7("dxy_bp.txt");
+	for(int i = 0; i < m; ++i)
+		file7 << nn.get_gradient(i) << std::endl;
+	file7.close();
 
 
-   return 0;
+	return 0;
 }
