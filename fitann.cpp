@@ -66,10 +66,10 @@ int main (int argc, const char* argv[])
 	fileY.close();
 
 	Eigen::VectorXi topo(4);
-	topo << n_input, 8, 6, n_output;
+	topo << n_input, 10, 6, n_output;
 
 	nnet::neural_net nn(topo);
-	nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 50});
+	nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 200});
 
 	nn.autoscale(X,Y);
 
