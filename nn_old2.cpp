@@ -269,7 +269,12 @@ namespace nnet
         // Resize jacobian and define error. 
         je_.resize(nparam_);
         j_.resize(P*Q, nparam_);
-        vector_t error(P*Q);	
+        vector_t error(P*Q);
+
+		// Define error on d(output)/d(input) gradient
+		//std::vector<vector_t> dererror;
+		//for(size_t i = 0; i < X.cols(); ++i)
+			//dererror.push_back(error);		
         
         // MSE. 
         f_type mse = 0.;
@@ -285,24 +290,26 @@ namespace nnet
 
 			// compute error on derivative
 			for(size_t l = 0; l < X.cols(); ++l)
+				//dererror[l].segment(k*S, S) = (((layers_.back().da[l]*y_scale_.asDiagonal().inverse())*x_scale_(l,0)).transpose() - (Z[l].row(k).transpose()))*(1.0-ratio);
 				error.segment(k*P+(l+1)*S, S) = (((layers_.back().da[l]*y_scale_.asDiagonal().inverse())*x_scale_.row(l)).transpose() - (Z[l].row(k).transpose()))*(1.0-ratio);
 
             // Compute loss. 
             mse += error.segment(k*P, S).transpose().rowwise().squaredNorm().mean()/P;
 			for(size_t l = 0; l < X.cols(); ++l)				
 				mse += error.segment(k*P+(l+1)*S, S).transpose().rowwise().squaredNorm().mean()/P;
+			//mse += dererror[l].segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*(1.0-ratio);
 
             // Number of layers. 
             size_t m = layers_.size();
 
             // Compute sensitivities. 
             size_t j = nparam_;
+
+			// Redo as delta = dEdl and delta2 = dEdldX until 2nd backprop
             layers_[m-1].delta = y_scale_.asDiagonal().inverse()*(ratio);
 			for(size_t l = 0; l < X.cols(); ++l)
 			{
-				//Need to set correct value to this for correct backpropagation from the linear layer to the first nonlinear layer.
-				(layers_[m-1].delta2[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)*0.0));
-				(layers_[m-1].delta3[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)));
+				(layers_[m-1].delta2[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)));
 			}
 
 
@@ -317,10 +324,9 @@ namespace nnet
 
 				for(size_t l = 0; l < X.cols(); ++l)
 				{
-					//Kept the commented out term for symmetry, but it doesn't appear in a linear layer.
-					layers_[m-1].dEdW = layers_[m-1].delta3[l].col(p)*layers_[m-2].da[l];  //+ layers_[m-1].delta2[l].col(p)*layers_[m-2].a;
+					layers_[m-1].dEdW = layers_[m-1].delta2[l].col(p)*layers_[m-2].da[l];
 					j_.block(k*P+(l+1)*S+p, j, 1, layers_[m-1].W.size()) = 
-					Map<vector_t>(layers_[m-1].dEdW.data(), layers_[m-1].dEdW.size()).transpose();
+					Map<vector_t>(layers_[m-1].dEdW.data(),	layers_[m-1].dEdW.size()).transpose();
 				}
             }
 			
@@ -330,7 +336,35 @@ namespace nnet
 			for(size_t l = 0; l < X.cols(); ++l)
 				j_.block(k*P+(l+1)*S, j, S, layers_[m-1].b.size()) = layers_[m-1].delta2[l].transpose()*0.0;
 
-            for(size_t i = layers_.size() - 2; i > 0; --i)
+
+			// Manually handle first backprop because its linear
+			layers_[m-2].delta = layers_[m-1].W.transpose()*layers_[m-1].delta;
+			for(size_t l = 0; l< X.cols(); ++l)
+			{
+				(layers_[m-2].delta2)[l] = layers_[m-1].W.transpose()*layers_[m-1].delta2[l];
+			}
+			
+			j -= layers_[m-2].W.size();
+            for(size_t p = 0; p < S; ++p)
+            {
+                layers_[m-2].dEdW = activation_gradient(layers_[m-2].a).asDiagonal()*layers_[m-2].delta*layers_[m-3].a;
+				j_.block(P*k+p, j, 1, layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(), layers_[i].dEdW.size()).transpose();
+				for(size_t l = 0; l< X.cols(); ++l)
+				{
+					layers_[m-2].dEdW = activation_gradient(layers_[m-2].a).asDiagonal()*layers_[m-2].delta2[l]*layers_[m-3].da[l] + 
+					(activation_secondgradient(layers_[m-2].a).asDiagonal()*layers_[m-2].delta2[l]*layers_[m-3].a).array() * 
+					(layers_[m-2].W * layers_[m-3].da[l].transpose()).array();
+
+					j_.block(k*P+(l+1)*S+p, j, 1, layers_[i].W.size()) = Map<vector_t>(layers_[i].dEdW.data(), layers_[i].dEdW.size()).transpose();
+				}
+            }
+
+			j_.block(P*k, j, S, layers_[i].b.size()) = layers_[m-2].delta;
+			for(size_t l = 0; l< X.cols(); ++l)
+				j_.block(k*P+(l+1)*S, j, S, layers_[i].b.size()) = layers_[i].delta2[l].transpose();
+
+
+            for(size_t i = layers_.size() - 3; i > 0; --i)
             {
 				layers_[i].delta = activation_gradient(layers_[i].a).asDiagonal()*layers_[i+1].W.transpose()*layers_[i+1].delta;
 				for(size_t l = 0; l< X.cols(); ++l)
@@ -361,6 +395,7 @@ namespace nnet
                 }
 
                 j -= layers_[i].b.size();
+				// is this correct?
                 j_.block(P*k, j, S, layers_[i].b.size()) = layers_[i].delta.transpose();
 				for(size_t l = 0; l< X.cols(); ++l)
 					j_.block(k*P+(l+1)*S, j, S, layers_[i].b.size()) = layers_[i].delta2[l].transpose();
@@ -372,6 +407,16 @@ namespace nnet
         jj_ /= (Q*S*ratio + X.cols()*S*(1.0-ratio));
         j_ /= (Q*S*ratio + X.cols()*S*(1.0-ratio));
         je_.noalias() = j_.transpose()*error;
+	
+		//for(size_t l = 0; l < X.cols(); ++l)
+		//{
+			//je_ += j_.transpose()*dererror[l];
+			//std::cout << dererror[l] << std::endl;
+		//}        
+
+
+			//std::cout << je_ << std::endl;
+		//exit(1);
 
 
 		return mse/Q;
@@ -385,7 +430,6 @@ namespace nnet
         tparams_.mu = 0.005;
 
         //int nex = X.rows();
-		// Is this correct?
 		int nex = X.rows()*X.cols();
         
         // Forward and back propogate to compute loss and Jacobian.
@@ -418,7 +462,7 @@ namespace nnet
                 optwb = wb - (beta*jjb + (tparams_.mu + alpha)*eye).colPivHouseholderQr().solve(beta*jeb + alpha*wb);
                 wse2 = optwb.transpose()*optwb;
                 set_wb(optwb);
-                mse2 = loss(X, Y, Z, ratio);
+                mse2 = loss(X, Y,Z,ratio);
                 tse2 = beta*mse2 + alpha*wse2;
                 
                 // Exit loop or reset values.
