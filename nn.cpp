@@ -58,13 +58,14 @@ namespace nnet
         nparam_ = 0; 
         nn_layer l;
         l.size = topology(0);
-		for (int i = 0; i < l.size; ++i)
-		{
-			matrix_t dai;
-			(l.da).push_back(dai);
-			(l.delta2).push_back(dai);
-			(l.delta3).push_back(dai);	
-		}
+	for (int i = 0; i < l.size; ++i)
+	{
+		matrix_t dai;
+		(l.da).push_back(dai);
+		(l.delta2).push_back(dai);
+		(l.delta3).push_back(dai);
+		(l.dEdldx).push_back(dai);	
+	}
         layers_.push_back(l);
 
         // init hidden and output layer
@@ -79,7 +80,8 @@ namespace nnet
 				matrix_t daj;
 				(l.da).push_back(daj);	
 				(l.delta2).push_back(daj);
-				(l.delta3).push_back(daj);	
+				(l.delta3).push_back(daj);
+				(l.dEdldx).push_back(dai);
 			}
             layers_.push_back(l);
             nparam_ += l.W.size() + l.b.size();
@@ -294,36 +296,38 @@ namespace nnet
 				error.segment(k*P+(l+1)*S, S) = (((layers_.back().da[l]*y_scale_.asDiagonal().inverse())*x_scale_.row(l)).transpose() - (Z[l].row(k).transpose()))*(1.0-ratio);
 
             // Compute loss. 
-            mse += error.segment(k*P, S).transpose().rowwise().squaredNorm().mean()/P;
-			for(size_t l = 0; l < X.cols(); ++l)				
-				mse += error.segment(k*P+(l+1)*S, S).transpose().rowwise().squaredNorm().mean()/P;
-			//mse += dererror[l].segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*(1.0-ratio);
+		mse += error.segment(k*P, S).transpose().rowwise().squaredNorm().mean()/P;
+		for(size_t l = 0; l < X.cols(); ++l)				
+			mse += error.segment(k*P+(l+1)*S, S).transpose().rowwise().squaredNorm().mean()/P;
+		//mse += dererror[l].segment(k*S, S).transpose().rowwise().squaredNorm().mean()/S*(1.0-ratio);
 
             // Number of layers. 
             size_t m = layers_.size();
 
             // Compute sensitivities. 
-            size_t j = nparam_;
-            layers_[m-1].delta = y_scale_.asDiagonal().inverse()*(ratio);
+	    size_t j = nparam_;
+	    //layers_[m-1].delta = y_scale_.asDiagonal().inverse()*(ratio);
+		layers_[m-1].dEdl = y_scale_.asDiagonal().inverse()*(ratio);
 			for(size_t l = 0; l < X.cols(); ++l)
 			{
-				(layers_[m-1].delta2[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)*0.0));
-				(layers_[m-1].delta3[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)));
+				//(layers_[m-1].delta2[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)*0.0));
+				//(layers_[m-1].delta3[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)));
+				layers_[m-1].dEdldx[l] = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)));
 			}
 
 
-            // Pack Jacobian.
-            j -= layers_[m-1].W.size();
+	    // Pack Jacobian.
+	    j -= layers_[m-1].W.size();
 			
             for(size_t p = 0; p < S; ++p)
             {
-                layers_[m-1].dEdW = (layers_[m-1].delta.col(p)*layers_[m-2].a);
+                layers_[m-1].dEdW = (layers_[m-1].dEdl.col(p)*layers_[m-2].a);
 				
                 j_.block(P*k+p, j, 1, layers_[m-1].W.size()) = Map<vector_t>(layers_[m-1].dEdW.data(), layers_[m-1].dEdW.size()).transpose();
 
 				for(size_t l = 0; l < X.cols(); ++l)
 				{
-					layers_[m-1].dEdW = layers_[m-1].delta3[l].col(p)*layers_[m-2].da[l] + layers_[m-1].delta2[l].col(p)*layers_[m-2].a;
+					layers_[m-1].dEdW = layers_[m-1].dEdldx[l].col(p)*layers_[m-2].da[l];
 					j_.block(k*P+(l+1)*S+p, j, 1, layers_[m-1].W.size()) = Map<vector_t>(layers_[m-1].dEdW.data(), layers_[m-1].dEdW.size()).transpose();
 				}
             }

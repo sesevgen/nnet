@@ -17,6 +17,8 @@ namespace nnet
 		size_t size;
 		matrix_t a, z, delta; 
 		std::vector<matrix_t> delta2, delta3;
+		matrix_t dEdl;
+		std::vector<matrix_t> dEdldx;
 		matrix_t W, dEdW, dEddW;
 		vector_t b;
 

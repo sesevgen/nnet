@@ -73,7 +73,7 @@ int main (int argc, const char* argv[])
 
 	nn.autoscale(X,Y);
 
-	nn.train(X,Y,Z,1.0, true);
+	nn.train(X,Y,Z,0.0, true);
 	//nn.train(X,Y,true);
 
 	nn.forward_pass(X);
