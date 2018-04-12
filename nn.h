@@ -26,7 +26,7 @@ namespace nnet
 
 	struct train_param
 	{
-		f_type mu, mu_max, mu_scale, min_grad, min_loss;
+		f_type mu, mu_max, mu_scale, min_grad, min_loss, ratio;
 		int max_iter;
 	};
 
@@ -76,10 +76,10 @@ namespace nnet
 		* Ratio = 1 -> pure value learning, Ratio = 0 -> pure gradient learning. 
 		*/
 		f_type loss(const matrix_t& X, const matrix_t& Y);
-		f_type loss(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio = 0.5);
+		f_type loss(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z);
 
 		void train(const matrix_t& X, const matrix_t& Y, bool verbose = false);
-		void train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio = 0.5, bool verbose = false);
+		void train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, bool verbose = false);
 		
 		/** Get training parameters. */
 		train_param get_train_params() const;

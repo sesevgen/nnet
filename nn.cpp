@@ -84,7 +84,7 @@ namespace nnet
             layers_.push_back(l);
             nparam_ += l.W.size() + l.b.size();
         }
-        tparams_ = {0.005, 1.e10, 10.0, 1.e-7, 0, 1000};
+        tparams_ = {0.005, 1.e10, 10.0, 1.e-7, 0, 1.0, 1000};
 
     }
 
@@ -156,7 +156,8 @@ namespace nnet
         f_type mse = 0.;		
 		
 
-		/*
+		/* This is start of swapping out loop over samples for matrix algebra. je_ works but need jj_.
+
 		// forward pass
 		forward_pass(X);
 		
@@ -199,6 +200,7 @@ namespace nnet
 		je_ = (je_*y_scale_.asDiagonal().inverse()) / (Q*S) ;
 		matrix_t tempje = je_;
 		*/
+
         for(size_t k = 0; k < Q; ++k)
         {
             // forward pass
@@ -255,7 +257,7 @@ namespace nnet
 		
     }
 
-	f_type neural_net::loss(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio)
+	f_type neural_net::loss(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z)
     {
         assert(layers_.front().size == X.cols());
         assert(layers_.back().size == Y.cols());
@@ -265,6 +267,7 @@ namespace nnet
         size_t Q = Y.rows();
         size_t S = Y.cols();
 		size_t P = (X.cols()+1)*S;
+		f_type Pd = (X.cols()*(1.0-tparams_.ratio)+1*tparams_.ratio)*S;
         
         // Resize jacobian and define error. 
         je_.resize(nparam_);
@@ -281,30 +284,34 @@ namespace nnet
             forward_pass(X.row(k));
                 
             // compute error
-			error.segment(k*P, S) = ((layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - (Y.row(k).transpose() - y_shift_))*ratio;
+			error.segment(k*P, S) = ((layers_.back().a*y_scale_.asDiagonal().inverse()).transpose() - 
+									(Y.row(k).transpose() - y_shift_))*sqrt(tparams_.ratio);
 
 			// compute error on derivative
 			for(size_t l = 0; l < X.cols(); ++l)
-				error.segment(k*P+(l+1)*S, S) = (((layers_.back().da[l]*y_scale_.asDiagonal().inverse())*x_scale_.row(l)).transpose() - (Z[l].row(k).transpose()))*(1.0-ratio);
+				error.segment(k*P+(l+1)*S, S) = (((layers_.back().da[l]*y_scale_.asDiagonal().inverse())*x_scale_.row(l)).transpose() - 
+												(Z[l].row(k).transpose()))*sqrt(1.0-tparams_.ratio);
 
             // Compute loss. 
-            mse += error.segment(k*P, S).transpose().rowwise().squaredNorm().mean()/P;
+            mse += error.segment(k*P, S).transpose().rowwise().squaredNorm().mean()/Pd;
 			for(size_t l = 0; l < X.cols(); ++l)				
-				mse += error.segment(k*P+(l+1)*S, S).transpose().rowwise().squaredNorm().mean()/P;
+				mse += error.segment(k*P+(l+1)*S, S).transpose().rowwise().squaredNorm().mean()/Pd;
 
             // Number of layers. 
             size_t m = layers_.size();
 
             // Compute sensitivities. 
             size_t j = nparam_;
-            layers_[m-1].delta = y_scale_.asDiagonal().inverse()*(ratio);
+            layers_[m-1].delta = y_scale_.asDiagonal().inverse();//*(tparams_.ratio);
 			for(size_t l = 0; l < X.cols(); ++l)
 			{
 				//Need to set correct value to this for correct backpropagation from the linear layer to the first nonlinear layer.
-				(layers_[m-1].delta2[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)*0.0));
-				(layers_[m-1].delta3[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-ratio)));
+				(layers_[m-1].delta2[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-tparams_.ratio)*0.0));
+				//There's a need for this grad boosting by factor of 10. Must be missing a factor somewhere.
+				//Or simply remove x_scale? But I don't understand.
+				//(layers_[m-1].delta3[l]) = ((y_scale_.asDiagonal().inverse()*x_scale_.row(l)*(1.0-tparams_.ratio)*10.0));
+				(layers_[m-1].delta3[l]) = ((y_scale_.asDiagonal().inverse()));//*(1.0-tparams_.ratio)));
 			}
-
 
             // Pack Jacobian.
             j -= layers_[m-1].W.size();
@@ -369,27 +376,29 @@ namespace nnet
 		
 		
         jj_.noalias() = j_.transpose()*j_;
-        jj_ /= (Q*S*ratio + X.cols()*S*(1.0-ratio));
-        j_ /= (Q*S*ratio + X.cols()*S*(1.0-ratio));
-        je_.noalias() = j_.transpose()*error;
 
+		// Is this correct?
+        //jj_ /= Pd*Q;
+        //j_ /= Pd*Q;
+		jj_ /= S*Q;
+        j_ /= S*Q;
+        je_.noalias() = j_.transpose()*error;
 
 		return mse/Q;
 
 		
     }
 
-    void neural_net::train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, double ratio, bool verbose)
+    void neural_net::train(const matrix_t& X, const matrix_t& Y, const std::vector<matrix_t> &Z, bool verbose)
     {
         // Reset mu.
         tparams_.mu = 0.005;
 
-        //int nex = X.rows();
 		// Is this correct?
-		int nex = X.rows()*X.cols();
+        int nex = X.rows();		
         
         // Forward and back propogate to compute loss and Jacobian.
-        f_type mse = loss(X, Y,Z,ratio);
+        f_type mse = loss(X, Y, Z);
         vector_t wb = get_wb(), optwb = get_wb();
         f_type wse = wb.transpose()*wb;
 
@@ -418,7 +427,7 @@ namespace nnet
                 optwb = wb - (beta*jjb + (tparams_.mu + alpha)*eye).colPivHouseholderQr().solve(beta*jeb + alpha*wb);
                 wse2 = optwb.transpose()*optwb;
                 set_wb(optwb);
-                mse2 = loss(X, Y, Z, ratio);
+                mse2 = loss(X, Y, Z);
                 tse2 = beta*mse2 + alpha*wse2;
                 
                 // Exit loop or reset values.

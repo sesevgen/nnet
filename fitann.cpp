@@ -19,10 +19,9 @@ int main (int argc, const char* argv[])
 	int n_output = 1;
 	// number of training samples
 	int m = 961;
-//int m = 161;
 	// number of evaluation samples
 	int k = 961;
-//int k = 161;
+
 	   
 	// training inputs
 	matrix_t X(m, n_input);
@@ -51,29 +50,43 @@ int main (int argc, const char* argv[])
 	}
 
 	fileZ.close();
-	std::ifstream fileY("adp_ann_example", std::ios::in);
+	std::ifstream fileY("adp_abf_example_integrated.txt", std::ios::in);
 
 	for(int i = 0; i < m; ++i)
 	{
 		fileY >> eater;
 		fileY >> eater;
-		fileY >> eater;
+		//fileY >> eater;
 
 		//Y(i,0) = 0.0;
 
 		fileY >> Y(i,0);	
 	}
 	fileY.close();
+	
+	// Flip sign because integrator flips it.
+	Y = -Y;
+
+	/*
+	std::cout << X << std::endl;
+	std::cout << Y << std::endl;
+	for(int i = 0; i < m; ++i)
+	{
+		for(int j = 0; j < Z.size(); ++j)
+			std::cout << Z[j](i,0) << "  " ;
+		std::cout << std::endl;
+	}
+	*/
 
 	Eigen::VectorXi topo(4);
-	topo << n_input, 10, 6, n_output;
+	topo << n_input, 12, 6, n_output;
 
 	nnet::neural_net nn(topo);
-	nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 200});
+	nn.set_train_params({0.005, 1.e10, 10.0, 1.e-7, 0, 0.8, 100});
 
 	nn.autoscale(X,Y);
 
-	nn.train(X,Y,Z,1.0, true);
+	nn.train(X,Y,Z,true);
 	//nn.train(X,Y,true);
 
 	nn.forward_pass(X);

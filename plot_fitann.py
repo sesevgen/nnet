@@ -4,9 +4,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 #X = np.loadtxt('adp_ann_example')
-X = np.loadtxt('adp_abf_example')
+X = np.loadtxt('adp_abf_example_integrated.txt')
 Y = X[:,1]
-Z = X[:,3]
+Z = X[:,2]
 X = X[:,0]
 
 dX = np.loadtxt('dx.txt')
@@ -24,13 +24,13 @@ Znn = np.loadtxt('output.txt')
 znng = np.reshape(Znn, (31, 31))
 
 plt.figure()
-plt.contour(xg, yg, zg,colors='k')
+plt.contour(xg, yg, (zg-np.amin(zg)),colors='k')
 plt.contourf(xg, yg, zg)
 plt.show()
 
 plt.figure()
-plt.contour(xg, yg, znng,colors='k')
-plt.contourf(xg, yg, znng)
+plt.contour(xg, yg, znng-np.amin(znng),colors='k')
+plt.contourf(xg, yg, znng-np.amin(znng))
 plt.show()
 
 plt.figure()
